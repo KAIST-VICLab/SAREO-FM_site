@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SAREO-FM: Decoupled Semantic Supervision for SAR-EO Foundation Models</title>
+  <meta name="description" content="SAREO-FM is a unified masked-autoencoder foundation model for SAR, EO and joint SAR–EO observations. Learnable semantic queries receive the vision-foundation-model supervision while SAR and EO tokens receive masked reconstruction, with all three streams interacting in one shared encoder.">
+  <meta name="author" content="Jeonghyeok Do, Munchurl Kim">
+  <meta name="theme-color" content="#D63370">
+  <link rel="canonical" href="https://kaist-viclab.github.io/SAREO-FM_site/">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="SAREO-FM">
+  <meta property="og:title" content="SAREO-FM: Decoupled Semantic Supervision for SAR-EO Foundation Models">
+  <meta property="og:description" content="One shared encoder for SAR-only, EO-only and joint SAR–EO input: learnable semantic queries take the vision-foundation-model supervision, SAR and EO tokens take masked reconstruction. Pretrained on the million-scale SAR-1M corpus.">
+  <meta property="og:url" content="https://kaist-viclab.github.io/SAREO-FM_site/">
+  <meta property="og:image" content="https://kaist-viclab.github.io/SAREO-FM_site/static/images/og.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="The SAREO-FM wordmark above building-damage maps on BRIGHT: pre-event EO, post-event SAR, ground truth, SAREO-FM with SAR+EO, EO-only and SAR-only input, and SARMAE with SAR-only input.">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="SAREO-FM: Decoupled Semantic Supervision for SAR-EO Foundation Models">
+  <meta name="twitter:description" content="Semantic queries take the VFM supervision, SAR and EO tokens take masked reconstruction: one encoder for SAR, EO, or both.">
+  <meta name="twitter:image" content="https://kaist-viclab.github.io/SAREO-FM_site/static/images/og.jpg">
+  <meta name="twitter:image:alt" content="The SAREO-FM wordmark above building-damage maps on BRIGHT: pre-event EO, post-event SAR, ground truth, SAREO-FM with SAR+EO, EO-only and SAR-only input, and SARMAE with SAR-only input.">
+  <link rel="icon" href="static/images/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="icon" href="static/images/favicon-64.png" sizes="64x64" type="image/png">
+  <link rel="apple-touch-icon" href="static/images/apple-touch-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@500..800&display=swap">
+  <link rel="stylesheet" href="static/css/family.css">
+  <link rel="stylesheet" href="static/css/style.css">
+  <noscript><style>a[href*="/XXXX.XXXX"], a[data-soon] { pointer-events: none; cursor: default; }</style></noscript>
+  <script>document.documentElement.classList.add('js');</script>
+  <script defer src="static/js/family.js"></script>
+  <script defer src="static/js/main.js"></script>
+</head>
+<body>
+
+<svg class="icon-sprite" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
+  <symbol id="i-paper" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></symbol>
+  <symbol id="i-arxiv" viewBox="0 0 24 24"><path d="M3.5 9.5L12 4l8.5 5.5M4.5 20h15M6.5 11.5v5.5M10 11.5v5.5M14 11.5v5.5M17.5 11.5v5.5"/></symbol>
+  <symbol id="i-code" viewBox="0 0 24 24"><path d="M8.5 7.5L4 12l4.5 4.5M15.5 7.5L20 12l-4.5 4.5M13.5 5l-3 14"/></symbol>
+  <symbol id="i-gallery" viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></symbol>
+  <symbol id="i-cite" viewBox="0 0 24 24"><path d="M9 4.5c-1.9 0-3 .9-3 2.8v2.4c0 1.3-.7 2.1-2 2.3 1.3.2 2 1 2 2.3v2.4c0 1.9 1.1 2.8 3 2.8M15 4.5c1.9 0 3 .9 3 2.8v2.4c0 1.3.7 2.1 2 2.3-1.3.2-2 1-2 2.3v2.4c0 1.9-1.1 2.8-3 2.8"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="11" height="11" rx="2"/><path d="M15.5 8.5v-2a2 2 0 0 0-2-2h-7a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h2"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+  <symbol id="i-swipe" viewBox="0 0 24 24"><path d="M4 12h16M8 8l-4 4 4 4M16 8l4 4-4 4"/></symbol>
+  <symbol id="i-chevron" viewBox="0 0 24 24"><path d="M6.5 9.5L12 15l5.5-5.5"/></symbol>
+  <symbol id="i-expand" viewBox="0 0 24 24"><path d="M14 4h6v6M10 20H4v-6M20 4l-6.5 6.5M4 20l6.5-6.5"/></symbol>
+</svg>
+
+<a class="skip-link" href="#main">Skip to content</a>
+
+<nav class="topnav" aria-label="Page sections">
+  <div class="topnav-inner container container--wide">
+    <a class="topnav-brand" href="#top" aria-label="SAREO-FM, back to top"><img src="static/images/icon.png" width="84" height="84" alt=""><span class="wordmark" aria-hidden="true">SAREO<span>-FM</span></span></a>
+    <div class="topnav-links">
+      <a href="#qualitative">Qualitative</a>
+      <a href="#fewshot">Few-shot</a>
+      <a href="#results">Quantitative</a>
+      <a href="#method">Method</a>
+      <a href="#bibtex">BibTeX</a>
+    </div>
+    <a class="topnav-cta" href="static/paper/SAREO-FM.pdf" target="_blank" rel="noopener"><svg class="icon" aria-hidden="true"><use href="#i-paper"/></svg>Paper</a>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+<!-- lineage-menu:start -->
+<details class="lineage-menu">
+  <summary class="lineage-menu-btn">More research<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
+  <nav class="lineage-menu-panel" aria-label="Research line: Remote sensing">
+    <p class="lineage-menu-head"><b>Research line</b>Remote sensing</p>
+    <ol class="lineage-menu-list">
+      <li class="lineage-menu-stage"><a class="lineage-menu-item" href="https://kaist-viclab.github.io/U-Know-DiffPAN-site/"><span class="lineage-name">U-Know-DiffPAN</span><span class="lineage-venue">CVPR 2025</span></a></li>
+      <li class="lineage-menu-stage"><a class="lineage-menu-item" href="https://kaist-viclab.github.io/PAN-Crafter_site/"><span class="lineage-name">PAN-Crafter</span><span class="lineage-venue">ICCV 2025</span></a></li>
+      <li class="lineage-menu-stage"><a class="lineage-menu-item" href="https://kaist-viclab.github.io/C-DiffSET_site/"><span class="lineage-name">C-DiffSET</span><span class="lineage-venue">IEEE TCSVT 2026</span></a></li>
+      <li class="lineage-menu-stage"><a class="lineage-menu-item" href="https://kaist-viclab.github.io/GeoCore-9B_site/"><span class="lineage-name">GeoCore-9B</span><span class="lineage-venue">NeurIPS 2026</span></a></li>
+      <li class="lineage-menu-stage"><a class="lineage-menu-item" href="https://kaist-viclab.github.io/ReFlowSET_site/"><span class="lineage-name">ReFlowSET</span><span class="lineage-venue">arXiv 2026</span></a><a class="lineage-menu-item" href="https://kaist-viclab.github.io/GeoSET_site/"><span class="lineage-name">GeoSET</span><span class="lineage-venue">arXiv 2026</span></a><a class="lineage-menu-item" href="https://kaist-viclab.github.io/GeoCR_site/"><span class="lineage-name">GeoCR</span><span class="lineage-venue">arXiv 2026</span></a><span class="lineage-menu-item is-current" aria-current="page"><span class="lineage-name">SAREO-FM</span><span class="lineage-venue">arXiv 2026</span></span></li>
+    </ol>
+  </nav>
+</details>
+<!-- lineage-menu:end -->
+  <div class="container">
+    <h1 class="hero-h1">
+      <img class="hero-logo" src="static/images/logo.webp" width="1983" height="376" alt="SAREO-FM:" fetchpriority="high">
+      <span class="hero-title"><span class="t-line"><span class="hero-accent">Decoupled Semantic Supervision</span></span> <span class="t-line">for <span class="nowrap">SAR-EO</span> Foundation Models</span></span>
+    </h1>
+    <p class="hero-authors">
+      <span class="author"><a href="https://jeonghyeokdo.github.io/" target="_blank" rel="noopener">Jeonghyeok Do</a><sup>1</sup></span>
+      <span class="author"><a href="https://www.viclab.kaist.ac.kr/" target="_blank" rel="noopener">Munchurl Kim</a><sup>1,&dagger;</sup></span>
+    </p>
+    <p class="hero-affil"><span><sup>1</sup>Korea Advanced Institute of Science and Technology (KAIST), South Korea</span></p>
+    <p class="hero-notes"><span><sup>&dagger;</sup>&thinsp;Corresponding author</span><span class="mono mail"><a href="mailto:ehwjdgur0913@kaist.ac.kr">ehwjdgur0913@kaist.ac.kr</a><a href="mailto:mkimee@kaist.ac.kr">mkimee@kaist.ac.kr</a></span></p>
+    <p class="venue-pill">arXiv preprint, 2026</p>
+    <nav class="btn-row" aria-label="Paper resources">
+      <a class="btn" href="static/paper/SAREO-FM.pdf" target="_blank" rel="noopener"><svg class="icon" aria-hidden="true"><use href="#i-paper"/></svg>Paper</a>
+      <a class="btn" href="https://arxiv.org/abs/XXXX.XXXXX" target="_blank" rel="noopener"><svg class="icon" aria-hidden="true"><use href="#i-arxiv"/></svg>arXiv</a>
+      <a class="btn" href="https://github.com/KAIST-VICLab/SAREO-FM" target="_blank" rel="noopener"><svg class="icon" aria-hidden="true"><use href="#i-code"/></svg>Code</a>
+      <a class="btn" href="#qualitative"><svg class="icon" aria-hidden="true"><use href="#i-gallery"/></svg>Results</a>
+      <a class="btn" href="#bibtex"><svg class="icon" aria-hidden="true"><use href="#i-cite"/></svg>BibTeX</a>
+    </nav>
+    <details class="abstract-toggle" id="abstract" data-animate>
+      <summary><span>Abstract</span><svg class="icon" aria-hidden="true"><use href="#i-chevron"/></svg></summary>
+      <div class="abstract-panel">
+        <div class="abstract">
+          <p>Synthetic aperture radar (SAR) and electro-optical (EO) imagery provide complementary observations: SAR enables day-and-night, weather-resilient sensing, whereas EO provides rich appearance and fine-grained semantic cues. We introduce <b>SAREO-FM</b>, which avoids forcing a single token stream to serve two distinct roles: modality tokens preserve how each sensor observes the scene through masked reconstruction, while learnable semantic queries capture what the scene contains under guidance from a pretrained vision foundation model (VFM). By jointly encoding these queries with SAR and EO tokens, the queries acquire modality-grounded semantic context, while the modality-token outputs remain the explicit targets of masked reconstruction. This design assigns semantic and reconstruction supervision to separate token streams while preserving their interaction within the shared encoder. Pretrained on the million-scale SAR-1M corpus, SAREO-FM achieves strong unimodal transfer for both SAR-only and EO-only inputs, while delivering substantial gains from joint SAR&ndash;EO observations on tasks that benefit from complementary sensing.</p>
+        </div>
+      </div>
+    </details>
+  </div>
+</header>
+
+<main id="main">
+
+  <!-- Headline: paper Fig. 1 (coupled vs decoupled semantic supervision) -->
+  <section class="section section--headline" aria-labelledby="headline-title">
+    <div class="container container--wide">
+      <header class="section-head">
+        <h2 class="section-title" id="headline-title">Semantics to queries, pixels to tokens</h2>
+        <p class="lead">Semantic queries take the VFM supervision, SAR and EO tokens take masked reconstruction, all in one shared encoder.</p>
+      </header>
+      <figure class="figure fig-fit" style="--ar: 1.1334">
+        <a class="figure-media zoom" href="static/images/motivation_full.jpg" data-title="Coupled versus decoupled semantic supervision">
+          <img src="static/images/motivation_1600.jpg"
+               srcset="static/images/motivation_1200.jpg 1200w, static/images/motivation_1600.jpg 1600w, static/images/motivation_2000.jpg 2000w"
+               sizes="min(calc(100vw - 2 * clamp(16px, 4vw, 32px)), 1240px, max(640px, calc((100vh - 120px) * 1.1334)))"
+               width="1600" height="1412" fetchpriority="high" decoding="async"
+               alt="Two panels. Previous work: masked SAR tokens pass through a SAR encoder whose output tokens are both decoded by a SAR decoder for the pixel loss and aligned with VFM features of the EO image, one stream with two duties (coupled); raw EO is not used as an input. SAREO-FM (ours): masked SAR tokens, masked raw EO tokens and learnable semantic queries enter one SAREO encoder; the SAR and EO output tokens go to separate SAR and EO decoders for the pixel losses, while only the query outputs are aligned with the VFM features (decoupled), for SAR, EO or SAR plus EO input.">
+        </a>
+        <figcaption><b>Coupled versus decoupled semantic supervision.</b> Top: prior methods align image tokens with <span class="nowrap">EO-derived</span> VFM features, so one token stream serves both alignment and pixel reconstruction. Bottom: SAREO-FM supervises learnable semantic queries and reconstructs SAR and EO from the modality tokens.</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <!-- Qualitative results: native tiles of paper Fig. 5 (BRIGHT) as a gallery; then Figs. 3-4 (SAR transfer) as a sub-section -->
+  <section class="section section--band" id="qualitative" aria-labelledby="qualitative-title">
+    <div class="container container--wide">
+      <header class="section-head">
+        <h2 class="section-title" id="qualitative-title">Fusion recovers what one sensor misses</h2>
+        <p class="lead">Building-damage maps on BRIGHT from pre-event EO and post-event SAR: the fused input recovers destroyed buildings that the <span class="nowrap">single-modality</span> models predict as intact or background.</p>
+      </header>
+
+      <div class="legend" aria-label="Tile legend">
+        <span class="legend-item"><span class="legend-swatch legend-swatch--input"></span>Input</span>
+        <span class="legend-item"><span class="legend-swatch legend-swatch--ours"></span>SAREO-FM, SAR+EO (ours)</span>
+        <span class="legend-item"><span class="legend-swatch legend-swatch--ours-alt"></span>SAREO-FM, one modality</span>
+        <span class="legend-item"><span class="legend-swatch legend-swatch--gt"></span>Ground truth</span>
+        <span class="legend-item"><span class="legend-swatch"></span>Baseline</span>
+      </div>
+      <div data-gallery="bright"></div>
+      <noscript>
+        <figure class="figure">
+          <a class="figure-media" href="static/images/bright_full.jpg"><img src="static/images/bright_1600.jpg" width="1600" height="482" loading="lazy" alt="Paper Figure 5: two BRIGHT scenes, each with pre-event EO, post-event SAR, ground truth, SAREO-FM SAR+EO, SAREO-FM EO-only, SAREO-FM SAR-only and SARMAE SAR-only."></a>
+          <figcaption><b>Qualitative transfer on BRIGHT.</b> The interactive gallery needs JavaScript; this is the paper figure with the same scenes.</figcaption>
+        </figure>
+      </noscript>
+      <p class="carousel-hint"><span class="hint-pointer">Use the arrows or the <kbd>&larr;</kbd>&thinsp;<kbd>&rarr;</kbd> keys to change scene &middot; click a tile to compare it with the ground truth</span><span class="hint-touch">Swipe or use the arrows to change scene &middot; tap a tile to compare it with the ground truth</span></p>
+<script type="application/json" id="gallery-data">
+{"root":"static/tiles/","tileMin":200,"compareScale":2,"datasets":[{"id":"bright","name":"BRIGHT","unit":"Scene","dir":"bright","cols":[{"n":"Pre‑event EO","v":"Input","c":"Pre-event EO","k":"input","f":"01_pre-event-eo.jpg","w":310,"h":310},{"n":"Post‑event SAR","v":"Input","c":"Post-event SAR","k":"input","f":"02_post-event-sar.jpg","w":311,"h":310},{"n":"Ground truth","v":"Reference","c":"Ground truth","k":"gt","f":"03_ground-truth.png","w":310,"h":310},{"n":"SAREO‑FM","v":"SAR+EO","c":"SAREO-FM SAR+EO","k":"ours","f":"04_sareo-fm-sar-eo.png","w":310,"h":310},{"n":"SAREO‑FM","v":"EO-only","c":"SAREO-FM EO-only","k":"ours-alt","f":"05_sareo-fm-eo-only.png","w":311,"h":310},{"n":"SAREO‑FM","v":"SAR-only","c":"SAREO-FM SAR-only","k":"ours-alt","f":"06_sareo-fm-sar-only.png","w":311,"h":310},{"n":"SARMAE","v":"SAR-only","c":"SARMAE SAR-only","k":"baseline","f":"07_sarmae-sar-only.png","w":310,"h":310}],"scenes":[{"dir":"s01","name":"Scene 1"},{"dir":"s02","name":"Scene 2"}]}]}
+</script>
+      <p class="fig-note">Qualitative, in-corpus examples: BRIGHT also contributes source imagery to <span class="nowrap">SAR-1M</span>, so the scenes illustrate dense transfer rather than a full segmentation benchmark. <a class="zoom zoom-link" href="static/images/bright_full.jpg" data-title="Qualitative transfer on BRIGHT (paper Fig. 5)"><svg class="icon" aria-hidden="true"><use href="#i-expand"/></svg>Paper figure</a></p>
+
+      <header class="section-head section-head--sub" id="fewshot">
+        <h2 class="section-title" id="fewshot-title">Label-efficient SAR transfer</h2>
+        <p class="lead">With the encoder frozen, SAREO-FM is consistently stronger than SARMAE<sup>*</sup> on <span class="nowrap">FUSAR-Ship</span> from 2-shot onward and on <span class="nowrap">SAR-ACD</span> from 5-shot onward.</p>
+      </header>
+      <div class="fig-pair">
+        <figure class="figure fig-pair-plot">
+          <a class="figure-media zoom" href="static/images/fewshot_full.png" data-title="Frozen few-shot SAR transfer">
+            <img src="static/images/fewshot_1600.png"
+                 srcset="static/images/fewshot_1000.png 1000w, static/images/fewshot_1600.png 1600w"
+                 sizes="(min-width: 1304px) 606px, (min-width: 1100px) 47vw, calc(100vw - 2 * clamp(16px, 4vw, 32px))"
+                 width="1600" height="690" loading="lazy" decoding="async"
+                 alt="Two line plots of overall accuracy against shots (1, 2, 5, 10, 20, 40) with frozen encoders, for SARMAE* (gray, dashed), SAREO-FM both (teal) and SAREO-FM sem (ochre). FUSAR-Ship, left: the SAREO-FM curves lie above SARMAE* from 2 shots on, with the widest gap at 5 shots. SAR-ACD, right: SARMAE* is higher at 1 and 2 shots; SAREO-FM sem is higher from 5 shots on.">
+          </a>
+          <figcaption><b>Frozen few-shot SAR transfer.</b> We use fixed encoder features and train only the downstream classifier.</figcaption>
+        </figure>
+        <figure class="figure fig-pair-samples">
+          <a class="figure-media zoom" href="static/images/saracd_full.jpg" data-title="Qualitative comparison on SAR-ACD">
+            <img src="static/images/saracd_1600.jpg"
+                 srcset="static/images/saracd_1200.jpg 1200w, static/images/saracd_1600.jpg 1600w, static/images/saracd_2000.jpg 2000w"
+                 sizes="(min-width: 1304px) 606px, (min-width: 1100px) 47vw, calc(100vw - 2 * clamp(16px, 4vw, 32px))"
+                 width="1600" height="477" loading="lazy" decoding="async"
+                 alt="Four SAR-ACD aircraft chips. True A220: SAREO-FM predicts A220, SARMAE predicts ARJ21. True A330: SAREO-FM A330, SARMAE Boeing787. True ARJ21: SAREO-FM ARJ21, SARMAE Boeing737. True Boeing737: SAREO-FM Boeing737, SARMAE Boeing787.">
+          </a>
+          <figcaption><b>Qualitative comparison on SAR-ACD.</b> Representative test images misclassified by SARMAE<sup>*</sup> but correctly classified by SAREO-FM.</figcaption>
+        </figure>
+      </div>
+      <p class="fig-note">With only 40 examples per class on the <span class="nowrap">out-of-corpus</span> SAR-ACD, <span class="nowrap">end-to-end</span> fine-tuning with semantic queries raises accuracy from 68.50% to <b>78.40%</b> (<a href="#table-1">Table&nbsp;1</a>); the exact frozen few-shot values are in <a href="#table-6">Table&nbsp;6</a>. SARMAE<sup>*</sup>: the official SARMAE checkpoint under the same downstream protocol.</p>
+    </div>
+  </section>
+
+  <!-- Quantitative results: Tables 1-4 in tabs, appendix Tables 6-12 in disclosures -->
+  <section class="section" id="results" aria-labelledby="results-title">
+    <div class="container container--wide">
+      <header class="section-head">
+        <h2 class="section-title" id="results-title">Quantitative results</h2>
+        <p class="lead">SAREO-FM is best in <b>five of six</b> controlled SAR <span class="nowrap">fine-tuning</span> settings, surpasses its <b>DINOv3 teacher</b> with EO input, and joint <span class="nowrap">SAR&ndash;EO</span> input gives the <b>best result on both paired benchmarks</b>.</p>
+      </header>
+
+      <div class="tabs" id="tables">
+        <div class="tabs-head">
+          <div class="tablist" role="tablist" aria-label="Results tables">
+            <button class="tab" role="tab" type="button" id="tab-t1" aria-controls="panel-t1" aria-selected="true">Table 1<small>SAR fine-tuning</small></button>
+            <button class="tab" role="tab" type="button" id="tab-t2" aria-controls="panel-t2" aria-selected="false">Table 2<small>EO few-shot</small></button>
+            <button class="tab" role="tab" type="button" id="tab-t3" aria-controls="panel-t3" aria-selected="false">Table 3<small>Paired SAR&ndash;EO</small></button>
+            <button class="tab" role="tab" type="button" id="tab-t4" aria-controls="panel-t4" aria-selected="false">Table 4<small>Ablation</small></button>
+          </div>
+        </div>
+        <div class="tabpanel" role="tabpanel" id="panel-t1" aria-labelledby="tab-t1" tabindex="-1">
+<figure class="table-figure table-figure--sar-finetune" id="table-1" data-key="sar-finetune" data-tex-label="tab:sar_finetune">
+<figcaption><span class="fig-label">Table 1.</span> <b>SAR target classification with end-to-end fine-tuning.</b> The upper block reports published OA (%) under the source-specific protocol of each method and is included only as context. The lower block reports our controlled evaluation with identical data splits and downstream pipelines; mean and standard deviation over three seeds are shown. <sup>*</sup> denotes our re-evaluation of the official SARMAE checkpoint. <b>Bold</b> denotes the best controlled result.</figcaption>
+<div class="table-meta"><div class="table-legend"><span><span class="best">Bold</span> best controlled result</span><span>OA (%)</span></div><span class="table-hint"><svg class="icon" aria-hidden="true"><use href="#i-swipe"/></svg>Scroll for more columns</span></div>
+<div class="table-frame"><div class="table-scroll" tabindex="0" role="region" aria-label="Table 1 (scrolls horizontally)"><table class="results" id="table-1-t">
+<thead>
+<tr><th rowspan="2" scope="col" class="col-method">Method</th><th rowspan="2" scope="col" class="col-venue">Venue</th><th rowspan="2" scope="col" class="col-text">Backbone</th><th colspan="2" scope="colgroup" class="col-group grp-start"><span>FUSAR-Ship</span></th><th colspan="2" scope="colgroup" class="col-group grp-start"><span>MSTAR</span></th><th colspan="2" scope="colgroup" class="col-group grp-start"><span>SAR-ACD</span></th></tr>
+<tr><th scope="col" class="metric grp-start">40-shot</th><th scope="col" class="metric">30%</th><th scope="col" class="metric grp-start">40-shot</th><th scope="col" class="metric">30%</th><th scope="col" class="metric grp-start">40-shot</th><th scope="col" class="metric">30%</th></tr>
+</thead>
+<tbody>
+<tr class="group"><td colspan="9"><span class="group-label">Published results, each under its own source protocol (context only)</span></td></tr>
+<tr><td class="col-method">ResNet-50</td><td class="col-venue">CVPR'16</td><td class="col-text">ResNet-50</td><td class="num grp-start na">&ndash;</td><td class="num">58.41</td><td class="num grp-start na">&ndash;</td><td class="num">89.94</td><td class="num grp-start na">&ndash;</td><td class="num">59.70</td></tr>
+<tr><td class="col-method">Swin Transformer</td><td class="col-venue">ICCV'21</td><td class="col-text">Swin-B</td><td class="num grp-start na">&ndash;</td><td class="num">60.79</td><td class="num grp-start na">&ndash;</td><td class="num">82.97</td><td class="num grp-start na">&ndash;</td><td class="num">67.50</td></tr>
+<tr><td class="col-method">BEiT</td><td class="col-venue">ICLR'22</td><td class="col-text">ViT-B</td><td class="num grp-start">59.70</td><td class="num">71.13</td><td class="num grp-start">40.70</td><td class="num">69.75</td><td class="num grp-start na">&ndash;</td><td class="num">79.77</td></tr>
+<tr><td class="col-method">CROMA</td><td class="col-venue">NeurIPS'23</td><td class="col-text">ViT-B</td><td class="num grp-start">83.71</td><td class="num na">&ndash;</td><td class="num grp-start na">&ndash;</td><td class="num na">&ndash;</td><td class="num grp-start na">&ndash;</td><td class="num">88.99</td></tr>
+<tr><td class="col-method">SAR-JEPA</td><td class="col-venue">ISPRS JPRS'24</td><td class="col-text">ViT-B</td><td class="num grp-start">85.80</td><td class="num na">&ndash;</td><td class="num grp-start">91.60</td><td class="num na">&ndash;</td><td class="num grp-start">75.50</td><td class="num na">&ndash;</td></tr>
+<tr><td class="col-method">SARATR-X</td><td class="col-venue">TIP'25</td><td class="col-text">HiViT-B</td><td class="num grp-start">87.70</td><td class="num na">&ndash;</td><td class="num grp-start">98.10</td><td class="num na">&ndash;</td><td class="num grp-start">76.40</td><td class="num na">&ndash;</td></tr>
+<tr><td class="col-method">LoMaR</td><td class="col-venue">WACV'25</td><td class="col-text">ViT-B</td><td class="num grp-start">82.70</td><td class="num na">&ndash;</td><td class="num grp-start">77.00</td><td class="num na">&ndash;</td><td class="num grp-start">67.40</td><td class="num na">&ndash;</td></tr>
+<tr><td class="col-method">SUMMIT</td><td class="col-venue">IJAEOG'25</td><td class="col-text">ViT-B</td><td class="num grp-start">81.50</td><td class="num">71.91</td><td class="num grp-start">63.60</td><td class="num">98.39</td><td class="num grp-start">68.70</td><td class="num">84.25</td></tr>
+<tr><td class="col-method">Copernicus-FM</td><td class="col-venue">ICCV'25</td><td class="col-text">ViT-B</td><td class="num grp-start">87.61</td><td class="num na">&ndash;</td><td class="num grp-start na">&ndash;</td><td class="num na">&ndash;</td><td class="num grp-start na">&ndash;</td><td class="num">92.63</td></tr>
+<tr><td class="col-method">CoDe-MAE</td><td class="col-venue">arXiv'26</td><td class="col-text">HiViT-B</td><td class="num grp-start">89.40</td><td class="num na">&ndash;</td><td class="num grp-start">98.70</td><td class="num na">&ndash;</td><td class="num grp-start">78.30</td><td class="num na">&ndash;</td></tr>
+<tr><td class="col-method">MaRS</td><td class="col-venue">AAAI'26</td><td class="col-text">SwinV2-B</td><td class="num grp-start">77.70</td><td class="num na">&ndash;</td><td class="num grp-start">75.50</td><td class="num na">&ndash;</td><td class="num grp-start">68.40</td><td class="num na">&ndash;</td></tr>
+<tr><td class="col-method">SARMAE</td><td class="col-venue">CVPR'26</td><td class="col-text">ViT-B</td><td class="num grp-start">89.30</td><td class="num">92.92</td><td class="num grp-start">96.70</td><td class="num">99.61</td><td class="num grp-start na">&ndash;</td><td class="num">95.06</td></tr>
+<tr><td class="col-method">SARMAE</td><td class="col-venue">CVPR'26</td><td class="col-text">ViT-L</td><td class="num grp-start">90.86</td><td class="num">92.80</td><td class="num grp-start">97.24</td><td class="num">98.92</td><td class="num grp-start na">&ndash;</td><td class="num">95.63</td></tr>
+</tbody>
+<tbody>
+<tr class="group"><td colspan="9"><span class="group-label">Controlled evaluation: identical splits and downstream pipelines</span></td></tr>
+<tr><td class="col-method">Random initialization</td><td class="col-venue">&ndash;</td><td class="col-text">ViT-B</td><td class="num grp-start"><span class="v">60.31</span><span class="pm">&plusmn;1.39</span></td><td class="num"><span class="v">82.11</span><span class="pm">&plusmn;0.52</span></td><td class="num grp-start"><span class="v">34.71</span><span class="pm">&plusmn;0.09</span></td><td class="num"><span class="v">38.76</span><span class="pm">&plusmn;8.35</span></td><td class="num grp-start"><span class="v">33.14</span><span class="pm">&plusmn;2.60</span></td><td class="num"><span class="v">39.19</span><span class="pm">&plusmn;10.27</span></td></tr>
+<tr><td class="col-method">SARMAE<sup>*</sup></td><td class="col-venue">CVPR'26</td><td class="col-text">ViT-B</td><td class="num grp-start"><span class="v">90.09</span><span class="pm">&plusmn;0.36</span></td><td class="num"><span class="v">92.82</span><span class="pm">&plusmn;0.21</span></td><td class="num grp-start"><span class="v">94.54</span><span class="pm">&plusmn;1.72</span></td><td class="num"><span class="v">97.18</span><span class="pm">&plusmn;0.32</span></td><td class="num grp-start"><span class="v">68.50</span><span class="pm">&plusmn;2.60</span></td><td class="num best"><span class="v">95.01</span><span class="pm">&plusmn;0.85</span></td></tr>
+<tr class="ours"><td class="col-method">SAREO-FM (<span class="feat">sem</span>)</td><td class="col-venue">&ndash;</td><td class="col-text">ViT-B</td><td class="num grp-start"><span class="v">91.05</span><span class="pm">&plusmn;0.16</span></td><td class="num best"><span class="v">93.13</span><span class="pm">&plusmn;0.14</span></td><td class="num grp-start best"><span class="v">97.57</span><span class="pm">&plusmn;0.42</span></td><td class="num"><span class="v">99.13</span><span class="pm">&plusmn;0.54</span></td><td class="num grp-start best"><span class="v">78.40</span><span class="pm">&plusmn;1.24</span></td><td class="num"><span class="v">93.34</span><span class="pm">&plusmn;0.55</span></td></tr>
+<tr class="ours"><td class="col-method">SAREO-FM (<span class="feat">both</span>)</td><td class="col-venue">&ndash;</td><td class="col-text">ViT-B</td><td class="num grp-start best"><span class="v">91.41</span><span class="pm">&plusmn;0.23</span></td><td class="num"><span class="v">93.12</span><span class="pm">&plusmn;0.06</span></td><td class="num grp-start"><span class="v">96.66</span><span class="pm">&plusmn;0.31</span></td><td class="num best"><span class="v">99.36</span><span class="pm">&plusmn;0.47</span></td><td class="num grp-start"><span class="v">78.00</span><span class="pm">&plusmn;1.00</span></td><td class="num"><span class="v">92.84</span><span class="pm">&plusmn;0.68</span></td></tr>
+</tbody>
+</table></div></div>
+<p class="table-note">On the <span class="nowrap">out-of-corpus</span> SAR-ACD, semantic queries raise 40-shot accuracy from 68.50% to <b>78.40%</b>, a <span class="nowrap">9.90-point</span> gain; under 30% supervision, SARMAE<sup>*</sup> remains 1.67 points stronger. MSTAR and FUSAR-Ship are part of the SAR-1M pretraining corpus.</p>
+</figure>
+        </div>
+        <div class="tabpanel" role="tabpanel" id="panel-t2" aria-labelledby="tab-t2" tabindex="-1" hidden>
+<figure class="table-figure table-figure--eo-transfer" id="table-2" data-key="eo-transfer" data-tex-label="tab:eo_transfer">
+<figcaption><span class="fig-label">Table 2.</span> <b>Frozen few-shot EO transfer.</b> We report accuracy (%) for SAR and EO inputs over five support draws. CoDe-MAE values use its separate <span class="nowrap">10-shot</span> protocol and are included only as context.</figcaption>
+<div class="table-meta"><div class="table-legend"><span><span class="best">Bold</span> best</span><span>Accuracy (%)</span></div><span class="table-hint"><svg class="icon" aria-hidden="true"><use href="#i-swipe"/></svg>Scroll for more columns</span></div>
+<div class="table-frame"><div class="table-scroll" tabindex="0" role="region" aria-label="Table 2 (scrolls horizontally)"><table class="results" id="table-2-t">
+<thead>
+<tr><th rowspan="2" scope="col" class="col-method">Method / Feature</th><th colspan="4" scope="colgroup" class="col-group grp-start"><span>SAR</span></th><th colspan="4" scope="colgroup" class="col-group grp-start"><span>EO</span></th></tr>
+<tr><th scope="col" class="metric grp-start">1-shot</th><th scope="col" class="metric">5-shot</th><th scope="col" class="metric">10-shot</th><th scope="col" class="metric">40-shot</th><th scope="col" class="metric grp-start">1-shot</th><th scope="col" class="metric">5-shot</th><th scope="col" class="metric">10-shot</th><th scope="col" class="metric">40-shot</th></tr>
+</thead>
+<tbody>
+<tr><td class="col-method">DINOv3 (teacher)</td><td class="num grp-start"><span class="v">38.17</span><span class="pm">&plusmn;4.61</span></td><td class="num"><span class="v">50.72</span><span class="pm">&plusmn;2.68</span></td><td class="num"><span class="v">56.01</span><span class="pm">&plusmn;1.81</span></td><td class="num"><span class="v">64.35</span><span class="pm">&plusmn;1.56</span></td><td class="num grp-start"><span class="v">59.51</span><span class="pm">&plusmn;3.53</span></td><td class="num"><span class="v">75.96</span><span class="pm">&plusmn;3.15</span></td><td class="num"><span class="v">83.34</span><span class="pm">&plusmn;1.42</span></td><td class="num"><span class="v">90.88</span><span class="pm">&plusmn;0.65</span></td></tr>
+<tr><td class="col-method">SARMAE<sup>*</sup></td><td class="num grp-start"><span class="v">37.22</span><span class="pm">&plusmn;5.71</span></td><td class="num"><span class="v">48.64</span><span class="pm">&plusmn;3.00</span></td><td class="num"><span class="v">53.97</span><span class="pm">&plusmn;1.39</span></td><td class="num"><span class="v">64.72</span><span class="pm">&plusmn;1.12</span></td><td class="num grp-start"><span class="v">43.56</span><span class="pm">&plusmn;6.57</span></td><td class="num"><span class="v">59.57</span><span class="pm">&plusmn;3.05</span></td><td class="num"><span class="v">66.49</span><span class="pm">&plusmn;1.97</span></td><td class="num"><span class="v">78.36</span><span class="pm">&plusmn;1.07</span></td></tr>
+<tr><td class="col-method">CoDe-MAE</td><td class="num grp-start na">&ndash;</td><td class="num na">&ndash;</td><td class="num">59.88<sup>&dagger;</sup></td><td class="num na">&ndash;</td><td class="num grp-start na">&ndash;</td><td class="num na">&ndash;</td><td class="num">81.18<sup>&dagger;</sup></td><td class="num na">&ndash;</td></tr>
+<tr class="ours"><td class="col-method">SAREO-FM (<span class="feat">both</span>)</td><td class="num grp-start best"><span class="v">39.07</span><span class="pm">&plusmn;5.98</span></td><td class="num best"><span class="v">53.54</span><span class="pm">&plusmn;2.21</span></td><td class="num best"><span class="v">59.36</span><span class="pm">&plusmn;1.46</span></td><td class="num best"><span class="v">69.24</span><span class="pm">&plusmn;0.96</span></td><td class="num grp-start best"><span class="v">64.41</span><span class="pm">&plusmn;5.05</span></td><td class="num best"><span class="v">81.09</span><span class="pm">&plusmn;1.61</span></td><td class="num best"><span class="v">86.76</span><span class="pm">&plusmn;1.24</span></td><td class="num best"><span class="v">92.58</span><span class="pm">&plusmn;0.75</span></td></tr>
+</tbody>
+</table></div></div>
+<p class="table-note">With EO input, SAREO-FM surpasses its frozen DINOv3 teacher by 4.90, 5.13, 3.42 and 1.70 points from 1 to 40 shots; with SAR input it improves over SARMAE<sup>*</sup> at every shot count, by 1.85 to 5.39 points.</p>
+</figure>
+        </div>
+        <div class="tabpanel" role="tabpanel" id="panel-t3" aria-labelledby="tab-t3" tabindex="-1" hidden>
+<figure class="table-figure table-figure--multimodal" id="table-3" data-key="multimodal" data-tex-label="tab:multimodal">
+<figcaption><span class="fig-label">Table 3.</span> <b>Transfer on paired SAR&ndash;EO benchmarks.</b> We report OA (%) on <span class="nowrap">5-shot</span> So2Sat LCZ42 and micro-AP (%) on <span class="nowrap">5-shot</span> BigEarthNet-MM.</figcaption>
+<div class="table-meta"><div class="table-legend"><span><span class="best">Bold</span> best</span><span><span class="second">Underline</span> second best</span><span>OA (%) on So2Sat LCZ42 &middot; micro-AP (%) on BigEarthNet-MM</span></div><span class="table-hint"><svg class="icon" aria-hidden="true"><use href="#i-swipe"/></svg>Scroll for more columns</span></div>
+<div class="table-frame"><div class="table-scroll" tabindex="0" role="region" aria-label="Table 3 (scrolls horizontally)"><table class="results" id="table-3-t">
+<thead>
+<tr><th rowspan="2" scope="col" class="col-method">Input</th><th rowspan="2" scope="col" class="col-text">Method</th><th rowspan="2" scope="col" class="col-text">Feature</th><th colspan="2" scope="colgroup" class="col-group grp-start"><span>Benchmark</span></th></tr>
+<tr><th scope="col" class="metric grp-start">So2Sat LCZ42</th><th scope="col" class="metric">BigEarthNet-MM</th></tr>
+</thead>
+<tbody>
+<tr><td class="col-method">SAR+EO</td><td class="col-name">Random initialization</td><td class="col-text"><span class="feat">mod</span></td><td class="num grp-start"><span class="v">40.56</span><span class="pm">&plusmn;2.25</span></td><td class="num"><span class="v">54.29</span><span class="pm">&plusmn;2.30</span></td></tr>
+<tr><td class="col-method">EO</td><td class="col-name">DINOv3 (teacher)</td><td class="col-text"><span class="feat">mod</span></td><td class="num grp-start"><span class="v">54.25</span><span class="pm">&plusmn;3.87</span></td><td class="num second"><span class="v">64.73</span><span class="pm">&plusmn;1.43</span></td></tr>
+<tr class="ours"><td class="col-method">EO</td><td class="col-name">SAREO-FM</td><td class="col-text"><span class="feat">mod</span></td><td class="num grp-start second"><span class="v">58.14</span><span class="pm">&plusmn;2.90</span></td><td class="num"><span class="v">64.42</span><span class="pm">&plusmn;1.44</span></td></tr>
+<tr><td class="col-method">SAR</td><td class="col-name">SARMAE<sup>*</sup></td><td class="col-text"><span class="feat">mod</span></td><td class="num grp-start"><span class="v">28.96</span><span class="pm">&plusmn;1.68</span></td><td class="num"><span class="v">57.44</span><span class="pm">&plusmn;0.69</span></td></tr>
+<tr class="ours"><td class="col-method">SAR</td><td class="col-name">SAREO-FM</td><td class="col-text"><span class="feat">mod</span></td><td class="num grp-start"><span class="v">29.59</span><span class="pm">&plusmn;2.64</span></td><td class="num"><span class="v">60.47</span><span class="pm">&plusmn;0.79</span></td></tr>
+<tr class="ours"><td class="col-method">SAR+EO</td><td class="col-name">SAREO-FM</td><td class="col-text"><span class="feat">both</span></td><td class="num grp-start best"><span class="v">58.79</span><span class="pm">&plusmn;4.19</span></td><td class="num best"><span class="v">66.70</span><span class="pm">&plusmn;0.58</span></td></tr>
+</tbody>
+</table></div></div>
+<p class="table-note">On BigEarthNet-MM, joint input reaches <b>66.70</b> micro-AP, 2.28 points above the best SAREO-FM unimodal input; on So2Sat LCZ42, adding SAR to EO yields a smaller 0.65-point gain.</p>
+</figure>
+        </div>
+        <div class="tabpanel" role="tabpanel" id="panel-t4" aria-labelledby="tab-t4" tabindex="-1" hidden>
+<figure class="table-figure table-figure--ablation" id="table-4" data-key="ablation" data-tex-label="tab:ablation">
+<figcaption><span class="fig-label">Table 4.</span> <b>Cumulative component ablation.</b> All variants use matched pretraining and evaluation protocols. We report <span class="nowrap">10-shot</span> SAR linear-probing performance. Avg. denotes the arithmetic mean across the two benchmarks, while &Delta; measures the gain over the preceding configuration.</figcaption>
+<div class="table-meta"><div class="table-legend"><span><span class="best">Bold</span> best</span><span><span class="second">Underline</span> second best</span><span>OA (%)</span></div><span class="table-hint"><svg class="icon" aria-hidden="true"><use href="#i-swipe"/></svg>Scroll for more columns</span></div>
+<div class="table-frame"><div class="table-scroll" tabindex="0" role="region" aria-label="Table 4 (scrolls horizontally)"><table class="results" id="table-4-t">
+<thead>
+<tr><th scope="col" class="col-method">Pretraining configuration</th><th scope="col" class="metric grp-start">MSTAR (OA<span class="arrow">&uarr;</span>)</th><th scope="col" class="metric">FUSAR (OA<span class="arrow">&uarr;</span>)</th><th scope="col" class="metric">Avg. (OA<span class="arrow">&uarr;</span>)</th><th scope="col" class="metric grp-start">&Delta;</th></tr>
+</thead>
+<tbody>
+<tr><td class="col-method">Random initialization</td><td class="num grp-start"><span class="v">26.26</span><span class="pm">&plusmn;1.86</span></td><td class="num"><span class="v">47.86</span><span class="pm">&plusmn;4.89</span></td><td class="num">37.06</td><td class="num grp-start na">&ndash;</td></tr>
+<tr><td class="col-method">Plain MAE</td><td class="num grp-start"><span class="v">66.16</span><span class="pm">&plusmn;3.15</span></td><td class="num"><span class="v">76.46</span><span class="pm">&plusmn;2.52</span></td><td class="num">71.31</td><td class="num grp-start">+34.25</td></tr>
+<tr><td class="col-method">+ DINOv3 supervision</td><td class="num grp-start"><span class="v">73.49</span><span class="pm">&plusmn;2.31</span></td><td class="num"><span class="v">79.90</span><span class="pm">&plusmn;2.49</span></td><td class="num">76.70</td><td class="num grp-start">+5.39</td></tr>
+<tr><td class="col-method">+ Decoupled semantic supervision</td><td class="num grp-start second"><span class="v">77.11</span><span class="pm">&plusmn;2.14</span></td><td class="num second"><span class="v">82.55</span><span class="pm">&plusmn;2.15</span></td><td class="num second">79.83</td><td class="num grp-start">+3.13</td></tr>
+<tr class="ours"><td class="col-method">+ Raw EO modality (<b>SAREO-FM</b>)</td><td class="num grp-start best"><span class="v">78.41</span><span class="pm">&plusmn;2.14</span></td><td class="num best"><span class="v">84.00</span><span class="pm">&plusmn;2.88</span></td><td class="num best">81.21</td><td class="num grp-start">+1.38</td></tr>
+</tbody>
+</table></div></div>
+<p class="table-note">Decoupling semantic prediction from modality reconstruction adds 3.13 points on average; the complete SAREO-FM improves on plain MAE by 9.90 points.</p>
+</figure>
+        </div>
+      </div>
+
+      <div class="disclosures">
+      <details class="disclosure" id="exact-fewshot" data-animate>
+        <summary>Exact frozen few-shot SAR results <span class="summary-sub">Table&nbsp;6</span></summary>
+        <div class="disclosure-panel"><div class="disclosure-body">
+<figure class="table-figure table-figure--sar-fewshot" id="table-6" data-key="sar-fewshot" data-tex-label="tab:sar_fewshot">
+<figcaption><span class="fig-label">Table 6.</span> <b>Exact frozen few-shot SAR classification results corresponding to Fig.&nbsp;3 of the main paper.</b> We freeze the pretrained encoder and optimize only a linear downstream classifier. We report mean OA (%) and sample standard deviation over five matched support draws. <span class="feat">sem</span> uses semantic-query features, whereas <span class="feat">both</span> concatenates modality-token and semantic-query features. SARMAE<sup>*</sup> denotes the official checkpoint evaluated with the same downstream protocol. <b>Bold</b> and <u>underline</u> denote the best and second-best values within each dataset and shot count, respectively; shaded rows are ours.</figcaption>
+<div class="table-meta"><div class="table-legend"><span><span class="best">Bold</span> best</span><span><span class="second">Underline</span> second best</span><span>OA (%)</span></div><span class="table-hint"><svg class="icon" aria-hidden="true"><use href="#i-swipe"/></svg>Scroll for more columns</span></div>
+<div class="table-frame"><div class="table-scroll" tabindex="0" role="region" aria-label="Table 6 (scrolls horizontally)"><table class="results" id="table-6-t">
+<thead>
+<tr><th scope="col" class="col-method">Method / Feature</th><th scope="col" class="metric grp-start">1-shot</th><th scope="col" class="metric">2-shot</th><th scope="col" class="metric">5-shot</th><th scope="col" class="metric">10-shot</th><th scope="col" class="metric">20-shot</th><th scope="col" class="metric">40-shot</th></tr>
+</thead>
+<tbody>
+<tr class="group"><td colspan="7"><span class="group-label">FUSAR-Ship</span></td></tr>
+<tr><td class="col-method">SARMAE<sup>*</sup></td><td class="num grp-start"><span class="v">54.19</span><span class="pm">&plusmn;8.69</span></td><td class="num second"><span class="v">64.95</span><span class="pm">&plusmn;6.93</span></td><td class="num"><span class="v">70.03</span><span class="pm">&plusmn;3.48</span></td><td class="num"><span class="v">78.18</span><span class="pm">&plusmn;3.28</span></td><td class="num"><span class="v">83.44</span><span class="pm">&plusmn;2.03</span></td><td class="num"><span class="v">88.35</span><span class="pm">&plusmn;0.83</span></td></tr>
+<tr class="ours"><td class="col-method">SAREO-FM (<span class="feat">both</span>)</td><td class="num grp-start second"><span class="v">55.56</span><span class="pm">&plusmn;7.50</span></td><td class="num"><span class="v">64.79</span><span class="pm">&plusmn;3.81</span></td><td class="num second"><span class="v">72.84</span><span class="pm">&plusmn;3.97</span></td><td class="num second"><span class="v">80.46</span><span class="pm">&plusmn;1.81</span></td><td class="num second"><span class="v">85.32</span><span class="pm">&plusmn;1.79</span></td><td class="num best"><span class="v">89.81</span><span class="pm">&plusmn;0.70</span></td></tr>
+<tr class="ours"><td class="col-method">SAREO-FM (<span class="feat">sem</span>)</td><td class="num grp-start best"><span class="v">55.79</span><span class="pm">&plusmn;9.07</span></td><td class="num best"><span class="v">68.54</span><span class="pm">&plusmn;4.35</span></td><td class="num best"><span class="v">75.74</span><span class="pm">&plusmn;2.46</span></td><td class="num best"><span class="v">81.65</span><span class="pm">&plusmn;2.91</span></td><td class="num best"><span class="v">85.50</span><span class="pm">&plusmn;1.71</span></td><td class="num second"><span class="v">89.56</span><span class="pm">&plusmn;1.22</span></td></tr>
+
+</tbody>
+<tbody>
+<tr class="group"><td colspan="7"><span class="group-label">SAR-ACD</span></td></tr>
+
+<tr><td class="col-method">SARMAE<sup>*</sup></td><td class="num grp-start best"><span class="v">35.09</span><span class="pm">&plusmn;7.77</span></td><td class="num best"><span class="v">39.56</span><span class="pm">&plusmn;6.52</span></td><td class="num second"><span class="v">47.12</span><span class="pm">&plusmn;3.16</span></td><td class="num"><span class="v">51.68</span><span class="pm">&plusmn;4.08</span></td><td class="num"><span class="v">60.30</span><span class="pm">&plusmn;2.86</span></td><td class="num"><span class="v">70.11</span><span class="pm">&plusmn;1.82</span></td></tr>
+<tr class="ours"><td class="col-method">SAREO-FM (<span class="feat">both</span>)</td><td class="num grp-start second"><span class="v">33.81</span><span class="pm">&plusmn;6.30</span></td><td class="num"><span class="v">36.31</span><span class="pm">&plusmn;6.91</span></td><td class="num"><span class="v">44.78</span><span class="pm">&plusmn;4.56</span></td><td class="num second"><span class="v">51.87</span><span class="pm">&plusmn;4.12</span></td><td class="num second"><span class="v">60.69</span><span class="pm">&plusmn;2.75</span></td><td class="num second"><span class="v">71.35</span><span class="pm">&plusmn;2.01</span></td></tr>
+<tr class="ours"><td class="col-method">SAREO-FM (<span class="feat">sem</span>)</td><td class="num grp-start"><span class="v">33.64</span><span class="pm">&plusmn;6.95</span></td><td class="num second"><span class="v">36.87</span><span class="pm">&plusmn;5.83</span></td><td class="num best"><span class="v">48.10</span><span class="pm">&plusmn;3.02</span></td><td class="num best"><span class="v">53.65</span><span class="pm">&plusmn;3.19</span></td><td class="num best"><span class="v">61.65</span><span class="pm">&plusmn;3.35</span></td><td class="num best"><span class="v">71.72</span><span class="pm">&plusmn;1.74</span></td></tr>
+</tbody>
+</table></div></div>
+</figure>
+        </div></div>
+      </details>
+      <details class="disclosure" id="masking" data-animate>
+        <summary>Masking modes and active losses <span class="summary-sub">Tables&nbsp;7&ndash;8</span></summary>
+        <div class="disclosure-panel"><div class="disclosure-body">
+          <div class="stack stack--tables">
+<figure class="table-figure table-figure--token-counts" id="table-7" data-key="token-counts" data-tex-label="tab:token_counts">
+<figcaption><span class="fig-label">Table 7.</span> <b>Shared-encoder sequence composition.</b> Training counts use the 75% patch-mask ratio; downstream inference uses all available image patches.</figcaption>
+<div class="table-meta"><span class="table-hint"><svg class="icon" aria-hidden="true"><use href="#i-swipe"/></svg>Scroll for more columns</span></div>
+<div class="table-frame"><div class="table-scroll" tabindex="0" role="region" aria-label="Table 7 (scrolls horizontally)"><table class="results results--compact" id="table-7-t">
+<thead>
+<tr><th scope="col" class="col-method">Configuration</th><th scope="col" class="metric grp-start">SAR</th><th scope="col" class="metric">EO</th><th scope="col" class="metric">Queries</th><th scope="col" class="metric grp-start">Total</th></tr>
+</thead>
+<tbody>
+<tr><td class="col-method">Independent/shared masking</td><td class="num grp-start">64</td><td class="num">64</td><td class="num">256</td><td class="num grp-start">384</td></tr>
+<tr><td class="col-method">Complete EO dropping</td><td class="num grp-start">64</td><td class="num">0</td><td class="num">256</td><td class="num grp-start">320</td></tr>
+<tr><td class="col-method">Complete SAR dropping</td><td class="num grp-start">0</td><td class="num">64</td><td class="num">256</td><td class="num grp-start">320</td></tr>
+<tr><td class="col-method">Unpaired SAR training</td><td class="num grp-start">64</td><td class="num">0</td><td class="num">256</td><td class="num grp-start">320</td></tr>
+</tbody>
+<tbody>
+<tr><td class="col-method">SAR-only inference</td><td class="num grp-start">256</td><td class="num">0</td><td class="num">256</td><td class="num grp-start">512</td></tr>
+<tr><td class="col-method">EO-only inference</td><td class="num grp-start">0</td><td class="num">256</td><td class="num">256</td><td class="num grp-start">512</td></tr>
+<tr><td class="col-method">Joint SAR&ndash;EO inference</td><td class="num grp-start">256</td><td class="num">256</td><td class="num">256</td><td class="num grp-start">768</td></tr>
+</tbody>
+</table></div></div>
+</figure>
+
+<figure class="table-figure table-figure--mask-loss" id="table-8" data-key="mask-loss" data-tex-label="tab:mask_loss">
+<figcaption><span class="fig-label">Table 8.</span> <b>Student inputs, teacher availability, and active losses.</b> Retained image streams are masked by 75%, and all semantic queries remain active. The loss coefficients are <i>&lambda;</i><sub><i>s</i></sub>&nbsp;=&nbsp;1, <i>&lambda;</i><sub><i>e</i></sub>&nbsp;=&nbsp;1, and <i>&lambda;</i><sub>align</sub>&nbsp;=&nbsp;0.5.</figcaption>
+<div class="table-meta"><span class="table-hint"><svg class="icon" aria-hidden="true"><use href="#i-swipe"/></svg>Scroll for more columns</span></div>
+<div class="table-frame"><div class="table-scroll" tabindex="0" role="region" aria-label="Table 8 (scrolls horizontally)"><table class="results results--text" id="table-8-t">
+<thead>
+<tr><th scope="col" class="col-method">Sample / mode</th><th scope="col" class="col-text">Prob.</th><th scope="col" class="col-text">Student encoder image streams</th><th scope="col" class="col-text">Teacher input</th><th scope="col" class="col-text">Active objective</th></tr>
+</thead>
+<tbody>
+<tr><td class="col-method">Paired, independent masks</td><td class="num">0.35</td><td class="col-text">Visible SAR + visible EO</td><td class="col-text">Clean EO</td><td class="col-text"><i>&#8466;</i><span class="subsup"><sub>pix</sub><sup><i>s</i></sup></span>&nbsp;+ <i>&#8466;</i><span class="subsup"><sub>pix</sub><sup><i>e</i></sup></span>&nbsp;+ 0.5<i>&#8466;</i><sub>align</sub></td></tr>
+<tr><td class="col-method">Paired, shared mask</td><td class="num">0.35</td><td class="col-text">Visible SAR + visible EO</td><td class="col-text">Clean EO</td><td class="col-text"><i>&#8466;</i><span class="subsup"><sub>pix</sub><sup><i>s</i></sup></span>&nbsp;+ <i>&#8466;</i><span class="subsup"><sub>pix</sub><sup><i>e</i></sup></span>&nbsp;+ 0.5<i>&#8466;</i><sub>align</sub></td></tr>
+<tr><td class="col-method">Paired, complete EO dropping</td><td class="num">0.15</td><td class="col-text">Visible SAR only</td><td class="col-text">Clean EO, teacher only</td><td class="col-text"><i>&#8466;</i><span class="subsup"><sub>pix</sub><sup><i>s</i></sup></span>&nbsp;+ 0.5<i>&#8466;</i><sub>align</sub></td></tr>
+<tr><td class="col-method">Paired, complete SAR dropping</td><td class="num">0.15</td><td class="col-text">Visible EO only</td><td class="col-text">Clean EO</td><td class="col-text"><i>&#8466;</i><span class="subsup"><sub>pix</sub><sup><i>e</i></sup></span>&nbsp;+ 0.5<i>&#8466;</i><sub>align</sub></td></tr>
+</tbody>
+<tbody>
+<tr><td class="col-method">Unpaired SAR</td><td class="num na">&ndash;</td><td class="col-text">Visible SAR only</td><td class="col-text">Unavailable</td><td class="col-text"><i>&#8466;</i><span class="subsup"><sub>pix</sub><sup><i>s</i></sup></span></td></tr>
+<tr><td class="col-method">Unpaired EO</td><td class="num na">&ndash;</td><td class="col-text">Not sampled in this work</td><td class="col-text">&ndash;</td><td class="col-text">&ndash;</td></tr>
+</tbody>
+</table></div></div>
+</figure>
+          </div>
+        </div></div>
+      </details>
+      <details class="disclosure" id="datasets" data-animate>
+        <summary>Downstream datasets and evaluation scope <span class="summary-sub">Table&nbsp;9</span></summary>
+        <div class="disclosure-panel"><div class="disclosure-body">
+<figure class="table-figure table-figure--datasets" id="table-9" data-key="datasets" data-tex-label="tab:dataset_summary">
+<figcaption><span class="fig-label">Table 9.</span> <b>Downstream datasets and interpretation.</b> OA denotes overall accuracy; micro-AP denotes micro-averaged average precision. The paired EuroSAT protocol uses geospatially matched SAR observations in addition to standard EO imagery; standard EuroSAT itself is EO-only.</figcaption>
+<div class="table-meta"><span class="table-hint"><svg class="icon" aria-hidden="true"><use href="#i-swipe"/></svg>Scroll for more columns</span></div>
+<div class="table-frame"><div class="table-scroll" tabindex="0" role="region" aria-label="Table 9 (scrolls horizontally)"><table class="results results--text" id="table-9-t">
+<thead>
+<tr><th scope="col" class="col-method">Dataset</th><th scope="col" class="col-text">Input</th><th scope="col" class="col-text">Classes</th><th scope="col" class="col-text">Metric</th><th scope="col" class="col-text">Protocol</th><th scope="col" class="col-text">SAR-1M relation</th><th scope="col" class="col-text">Role in this work</th></tr>
+</thead>
+<tbody>
+<tr><td class="col-method">MSTAR</td><td class="col-text">SAR</td><td class="num">10</td><td class="col-text">OA</td><td class="col-text">1&ndash;40-shot / 30%</td><td class="col-text">In corpus</td><td class="col-text">In-corpus target transfer</td></tr>
+<tr><td class="col-method">FUSAR-Ship</td><td class="col-text">SAR</td><td class="num">10</td><td class="col-text">OA</td><td class="col-text">1&ndash;40-shot / 30%</td><td class="col-text">In corpus</td><td class="col-text">In-corpus ship transfer</td></tr>
+<tr><td class="col-method">SAR-ACD</td><td class="col-text">SAR</td><td class="num">5</td><td class="col-text">OA</td><td class="col-text">1&ndash;40-shot / 30%</td><td class="col-text">Out of corpus</td><td class="col-text">Primary out-of-corpus SAR test</td></tr>
+</tbody>
+<tbody>
+<tr><td class="col-method">EuroSAT protocol</td><td class="col-text">EO or SAR</td><td class="num">10</td><td class="col-text">OA</td><td class="col-text">1/5/10/40-shot</td><td class="col-text">No out-of-corpus claim</td><td class="col-text">Unimodal scene transfer</td></tr>
+<tr><td class="col-method">NWPU-RESISC45</td><td class="col-text">EO</td><td class="num">45</td><td class="col-text">OA</td><td class="col-text">Few-shot / higher supervision</td><td class="col-text">No out-of-corpus claim</td><td class="col-text">EO scene transfer</td></tr>
+<tr><td class="col-method">AID</td><td class="col-text">EO</td><td class="num">30</td><td class="col-text">OA</td><td class="col-text">Few-shot / higher supervision</td><td class="col-text">No out-of-corpus claim</td><td class="col-text">EO scene transfer</td></tr>
+</tbody>
+<tbody>
+<tr><td class="col-method">So2Sat LCZ42</td><td class="col-text">SAR, EO, or joint</td><td class="num">17</td><td class="col-text">OA</td><td class="col-text">5-shot, city-disjoint</td><td class="col-text">No out-of-corpus claim</td><td class="col-text">Paired single-label transfer</td></tr>
+<tr><td class="col-method">BigEarthNet-MM</td><td class="col-text">SAR, EO, or joint</td><td class="num">19</td><td class="col-text">micro-AP</td><td class="col-text">5-shot, official split</td><td class="col-text">No out-of-corpus claim</td><td class="col-text">Paired multi-label transfer</td></tr>
+<tr><td class="col-method">BRIGHT</td><td class="col-text">Pre-EO + post-SAR</td><td class="num">4</td><td class="col-text">Dense labels</td><td class="col-text">Qualitative only</td><td class="col-text">In-corpus source</td><td class="col-text">In-corpus dense diagnostic</td></tr>
+</tbody>
+</table></div></div>
+</figure>
+        </div></div>
+      </details>
+      <details class="disclosure" id="architecture" data-animate>
+        <summary>Architecture, components and readouts <span class="summary-sub">Tables&nbsp;10&ndash;12</span></summary>
+        <div class="disclosure-panel"><div class="disclosure-body">
+          <div class="table-pair">
+<figure class="table-figure table-figure--architecture" id="table-10" data-key="architecture" data-tex-label="tab:architecture">
+<figcaption><span class="fig-label">Table 10.</span> <b>Architecture summary.</b></figcaption>
+<div class="table-meta"><span class="table-hint"><svg class="icon" aria-hidden="true"><use href="#i-swipe"/></svg>Scroll for more columns</span></div>
+<div class="table-frame"><div class="table-scroll" tabindex="0" role="region" aria-label="Table 10 (scrolls horizontally)"><table class="results results--text" id="table-10-t">
+<thead>
+<tr><th scope="col" class="col-method">Component</th><th scope="col" class="col-text">Specification</th></tr>
+</thead>
+<tbody>
+<tr><td class="col-method">Input resolution</td><td class="col-text">256&times;256</td></tr>
+<tr><td class="col-method">Patch size / grid</td><td class="col-text">16&times;16 / 16&times;16</td></tr>
+<tr><td class="col-method">SAR / EO tokens</td><td class="col-text">256 per available modality</td></tr>
+<tr><td class="col-method">Shared encoder</td><td class="col-text">ViT-B/16, 12 blocks, <i>D</i>&nbsp;=&nbsp;768</td></tr>
+<tr><td class="col-method">Attention / MLP</td><td class="col-text">12 heads / ratio 4</td></tr>
+<tr><td class="col-method">Semantic queries</td><td class="col-text">256 learnable, spatially indexed</td></tr>
+<tr><td class="col-method">Position encoding</td><td class="col-text">Shared 2D sine&ndash;cosine grid</td></tr>
+<tr><td class="col-method">Stream encoding</td><td class="col-text">Learnable SAR / EO / query embeddings</td></tr>
+<tr><td class="col-method">Teacher</td><td class="col-text">Frozen DINOv3-7B patch features</td></tr>
+<tr><td class="col-method">Semantic projector</td><td class="col-text">Two-layer MLP</td></tr>
+<tr><td class="col-method">Reconstruction</td><td class="col-text">Separate SAR/EO decoders</td></tr>
+</tbody>
+</table></div></div>
+</figure>
+            <div class="stack stack--tables">
+<figure class="table-figure table-figure--lifecycle" id="table-11" data-key="lifecycle" data-tex-label="tab:lifecycle">
+<figcaption><span class="fig-label">Table 11.</span> <b>Lifecycle of SAREO-FM components.</b></figcaption>
+<div class="table-meta"><span class="table-hint"><svg class="icon" aria-hidden="true"><use href="#i-swipe"/></svg>Scroll for more columns</span></div>
+<div class="table-frame"><div class="table-scroll" tabindex="0" role="region" aria-label="Table 11 (scrolls horizontally)"><table class="results results--text" id="table-11-t">
+<thead>
+<tr><th scope="col" class="col-method">Component</th><th scope="col" class="col-text">Pretraining</th><th scope="col" class="col-text">Downstream</th></tr>
+</thead>
+<tbody>
+<tr><td class="col-method">Shared SAREO encoder</td><td class="col-text">Trainable</td><td class="col-text">Used</td></tr>
+<tr><td class="col-method">Semantic queries</td><td class="col-text">Trainable</td><td class="col-text">Used</td></tr>
+<tr><td class="col-method">SAR/EO patch embeddings</td><td class="col-text">Trainable</td><td class="col-text">Used as available</td></tr>
+<tr><td class="col-method">SAR/EO reconstruction decoders</td><td class="col-text">Trainable</td><td class="col-text">Discarded</td></tr>
+<tr><td class="col-method">Semantic projector</td><td class="col-text">Trainable</td><td class="col-text">Discarded</td></tr>
+<tr><td class="col-method">DINOv3-7B teacher</td><td class="col-text">Frozen</td><td class="col-text">Discarded</td></tr>
+</tbody>
+</table></div></div>
+</figure>
+
+<figure class="table-figure table-figure--readout-dims" id="table-12" data-key="readout-dims" data-tex-label="tab:readout_dims">
+<figcaption><span class="fig-label">Table 12.</span> <b>Image-level readout dimensions.</b></figcaption>
+<div class="table-meta"><span class="table-hint"><svg class="icon" aria-hidden="true"><use href="#i-swipe"/></svg>Scroll for more columns</span></div>
+<div class="table-frame"><div class="table-scroll" tabindex="0" role="region" aria-label="Table 12 (scrolls horizontally)"><table class="results results--compact" id="table-12-t">
+<thead>
+<tr><th scope="col" class="col-method">Available input</th><th scope="col" class="metric grp-start"><span class="feat">mod</span></th><th scope="col" class="metric"><span class="feat">sem</span></th><th scope="col" class="metric"><span class="feat">both</span></th></tr>
+</thead>
+<tbody>
+<tr><td class="col-method">SAR or EO</td><td class="num grp-start">768</td><td class="num">768</td><td class="num">1,536</td></tr>
+<tr><td class="col-method">SAR + EO</td><td class="num grp-start">1,536</td><td class="num">768</td><td class="num">2,304</td></tr>
+</tbody>
+</table></div></div>
+</figure>
+            </div>
+          </div>
+        </div></div>
+      </details>
+      </div>
+    </div>
+  </section>
+
+  <!-- Method (compact): paper Fig. 2 -->
+  <section class="section section--band" id="method" aria-labelledby="method-title">
+    <div class="container container--wide">
+      <header class="section-head">
+        <h2 class="section-title" id="method-title">One encoder for SAR, EO, or both</h2>
+      </header>
+      <figure class="figure">
+        <a class="figure-media zoom" href="static/images/method_full.jpg" data-title="Overview of SAREO-FM">
+          <img src="static/images/method_1600.jpg"
+               srcset="static/images/method_1200.jpg 1200w, static/images/method_1600.jpg 1600w, static/images/method_2000.jpg 2000w, static/images/method_2560.jpg 2560w"
+               sizes="(min-width: 1304px) 1240px, calc(100vw - 2 * clamp(16px, 4vw, 32px))"
+               width="1600" height="492" loading="lazy" decoding="async"
+               alt="SAREO-FM overview in three panels. Training: SAR and EO inputs are masked; their visible tokens and the learnable semantic queries enter the SAREO encoder; the SAR and EO output tokens go to a SAR decoder and an EO decoder for the SAR and EO pixel losses, and the query outputs are aligned with the features of a frozen vision foundation model applied to the EO input (alignment loss). Inference (downstream): only SAR, only EO, or joint SAR plus EO tokens, always with the semantic queries, pass through the frozen SAREO encoder to the downstream task. Modality masking strategy: cross-modal interaction with (i) independent and (ii) shared masking, and handling missing modality with (iii) EO masking and (iv) SAR masking.">
+        </a>
+        <figcaption><b>Overview of SAREO-FM.</b> The <span class="nowrap">semantic-query</span> outputs are aligned with a frozen VFM and never reach the decoders; the <span class="nowrap">modality-token</span> outputs are decoded for masked reconstruction; after pretraining, the encoder alone serves SAR, EO or joint input.</figcaption>
+      </figure>
+      <ol class="keypoints">
+        <li><span class="kp-num">01</span><b>Decoupled semantic supervision.</b> 256 learnable semantic queries, one per patch, are aligned <span class="nowrap">patch-wise</span> with frozen DINOv3-7B features and are excluded from the decoders.</li>
+        <li><span class="kp-num">02</span><b>Modality-specific reconstruction.</b> Separate SAR and EO decoders reconstruct the masked patches (75% of each retained modality) from the modality tokens.</li>
+        <li><span class="kp-num">03</span><b>Mixed modality masking.</b> Independent, shared, <span class="nowrap">EO-dropped</span> and <span class="nowrap">SAR-dropped</span> inputs (0.35/0.35/0.15/0.15) train one <span class="nowrap">ViT-B/16</span> encoder for SAR, EO or both.</li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- BibTeX -->
+  <section class="section" id="bibtex" aria-labelledby="bibtex-title">
+    <div class="container">
+      <header class="section-head">
+        <h2 class="section-title" id="bibtex-title">BibTeX</h2>
+      </header>
+      <div class="bibtex">
+        <div class="bibtex-head">
+          <button class="copy-btn" type="button" data-copy="#bibtex-code">
+            <svg class="icon icon-copy" aria-hidden="true"><use href="#i-copy"/></svg><svg class="icon icon-done" aria-hidden="true"><use href="#i-check"/></svg><span class="copy-label" aria-live="polite">Copy</span>
+          </button>
+        </div>
+<pre><code id="bibtex-code">@article{do2026sareofm,
+  title={SAREO-FM: Decoupled Semantic Supervision for SAR-EO Foundation Models},
+  author={Do, Jeonghyeok and Kim, Munchurl},
+  journal={arXiv preprint arXiv:XXXX.XXXXX},
+  year={2026}
+}</code></pre>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- lineage:start -->
+<nav class="lineage" aria-label="Research line: Remote sensing">
+  <div class="container">
+    <p class="lineage-head"><span class="lineage-title">Research line</span><span class="lineage-topic">Remote sensing</span></p>
+    <ol class="lineage-list">
+      <li class="lineage-stage"><a class="lineage-item" href="https://kaist-viclab.github.io/U-Know-DiffPAN-site/"><span class="lineage-name">U-Know-DiffPAN</span><span class="lineage-venue">CVPR 2025</span></a></li>
+      <li class="lineage-stage"><a class="lineage-item" href="https://kaist-viclab.github.io/PAN-Crafter_site/"><span class="lineage-name">PAN-Crafter</span><span class="lineage-venue">ICCV 2025</span></a></li>
+      <li class="lineage-stage"><a class="lineage-item" href="https://kaist-viclab.github.io/C-DiffSET_site/"><span class="lineage-name">C-DiffSET</span><span class="lineage-venue">IEEE TCSVT 2026</span></a></li>
+      <li class="lineage-stage"><a class="lineage-item" href="https://kaist-viclab.github.io/GeoCore-9B_site/"><span class="lineage-name">GeoCore-9B</span><span class="lineage-venue">NeurIPS 2026</span></a></li>
+      <li class="lineage-stage"><a class="lineage-item" href="https://kaist-viclab.github.io/ReFlowSET_site/"><span class="lineage-name">ReFlowSET</span><span class="lineage-venue">arXiv 2026</span></a><a class="lineage-item" href="https://kaist-viclab.github.io/GeoSET_site/"><span class="lineage-name">GeoSET</span><span class="lineage-venue">arXiv 2026</span></a><a class="lineage-item" href="https://kaist-viclab.github.io/GeoCR_site/"><span class="lineage-name">GeoCR</span><span class="lineage-venue">arXiv 2026</span></a><span class="lineage-item is-current" aria-current="page"><span class="lineage-name">SAREO-FM</span><span class="lineage-venue">arXiv 2026</span></span></li>
+    </ol>
+  </div>
+</nav>
+<!-- lineage:end -->
+
+<footer class="footer">
+  <div class="container footer-inner">
+    <p class="footer-meta"><span class="footer-brand"><img src="static/images/icon.png" width="84" height="84" alt="" loading="lazy"><span class="wordmark">SAREO<span>-FM</span></span></span>&nbsp;&middot; arXiv preprint, 2026&nbsp;&middot; Korea Advanced Institute of Science and Technology (KAIST)</p>
+    <nav class="footer-links" aria-label="Footer">
+      <a href="static/paper/SAREO-FM.pdf" target="_blank" rel="noopener">Paper</a>
+      <a href="https://arxiv.org/abs/XXXX.XXXXX" target="_blank" rel="noopener">arXiv</a>
+      <a href="https://github.com/KAIST-VICLab/SAREO-FM" target="_blank" rel="noopener">Code</a>
+      <a href="mailto:ehwjdgur0913@kaist.ac.kr,mkimee@kaist.ac.kr">Contact</a>
+      <a href="#top">Back to top &uarr;</a>
+    </nav>
+  </div>
+</footer>
+
+</body>
+</html>
