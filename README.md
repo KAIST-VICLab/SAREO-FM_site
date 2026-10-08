@@ -43,6 +43,5 @@ static/paper/             the paper (PDF)
 ## Links
 
 - Paper: `static/paper/SAREO-FM.pdf`
-- arXiv: the identifier is not assigned yet. Every arXiv link (hero button, footer, BibTeX) holds the placeholder
-  `XXXX.XXXXX` and is shown as pending ("soon") until the placeholder is replaced by the real identifier.
+- arXiv: https://arxiv.org/abs/2610.09317 (hero button, footer and BibTeX)
 - Code: https://github.com/KAIST-VICLab/SAREO-FM
